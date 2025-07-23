@@ -1,13 +1,19 @@
-# Stripe CLI Tool
+# Stripe CLI for MSaaS
 
-An interactive command-line tool for managing Stripe prices.
+A powerful interactive CLI tool to manage Stripe prices and products for multi-tenant SaaS applications.
+
+![Stripe CLI](https://img.shields.io/badge/Stripe%20CLI-Interactive-brightgreen)
 
 ## Features
 
-- View all Stripe prices with interactive selection
-- Display detailed price information with pretty-printed JSON
-- Edit price metadata using your preferred text editor
-- Real-time validation and notifications for changes
+- ✨ Fully interactive main menu with all commands in one place
+- 🔍 View and select Stripe prices with a formatted table
+- 📦 Manage products by application categories
+- 👥 View and filter subscriptions by customer email, date, or status
+- 📊 View detailed JSON output for Stripe prices, products, and subscriptions
+- ✏️ Edit price and product metadata using your preferred text editor
+- 🔄 View and manage inactive products
+- ⚡ Real-time validation and notifications for changes
 
 ## Available Commands
 

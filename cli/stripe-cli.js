@@ -14,22 +14,29 @@ const fs = require('fs').promises;
 const path = require('path');
 const { execSync } = require('child_process');
 const { promisify } = require('util');
+const figlet = require('figlet');
+clear = require('clear');
+
+// Import commands
+const reconciliationCommand = require('./commands/reconciliation.command');
 
 // Initialize Stripe
 const stripeApiKey = process.env.STRIPE_SECRET_KEY;
 if (!stripeApiKey) {
-  console.error(chalk.red('Error: STRIPE_SECRET_KEY not found in environment'));
-  console.log(chalk.yellow('Make sure you have set up .env file with STRIPE_SECRET_KEY'));
+  console.error(chalk.red('❌ Error: STRIPE_SECRET_KEY not found in environment'));
+  console.log(chalk.yellow('💡 Make sure you have set up .env file with STRIPE_SECRET_KEY'));
   process.exit(1);
 }
 
 const stripe = new Stripe(stripeApiKey);
 
-// Set up commander
+// Set up commander for passing arguments
 const program = new commander.Command();
 program
   .version('1.0.0')
-  .description('Interactive CLI for managing Stripe prices');
+  .description('Interactive CLI for managing Stripe prices')
+  .option('-i, --interactive', 'Start in interactive mode', true)
+  .option('-m, --menu', 'Show the main menu', true);
 
 // Helper function to pretty print JSON
 function prettyJson(obj) {
@@ -910,6 +917,12 @@ async function deleteProduct(productId) {
   }
 }
 
+// Command to run subscription reconciliation
+program
+  .command(reconciliationCommand.command)
+  .description(reconciliationCommand.description)
+  .action(reconciliationCommand.action);
+
 // Command to create a new product
 program
   .command('create-product')
@@ -1051,5 +1064,839 @@ program
     program.outputHelp();
   });
 
-// Parse command line arguments
+// Function to display main menu
+async function showMainMenu() {
+  // Clear the screen for a fresh start
+  clear();
+  
+  // Display welcome banner with figlet
+  console.log(
+    chalk.cyan(figlet.textSync('Stripe CLI', { horizontalLayout: 'full' }))
+  );
+  console.log(boxen(
+    `${chalk.bold('💳  Stripe MSaaS Manager')}\n\n` +
+    `${chalk.blue('👤')} Connected as: ${chalk.green(stripeApiKey.substring(0, 7) + '...')}\n` +
+    `${chalk.blue('🔧')} Mode: ${stripeApiKey.startsWith('sk_test') ? chalk.yellow('Test') : chalk.red('Live')}`,
+    { padding: 1, margin: 1, borderColor: 'cyan' }
+  ));
+  
+  // Display main menu
+  const { choice } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'choice',
+      message: '✨ What would you like to do?',
+      choices: [
+        { name: '🔍 View Active Products', value: 'products' },
+        { name: '📦 View Inactive Products', value: 'inactive-products' },
+        { name: '➕ Create New Product', value: 'create-product' },
+        { name: '🔍 View Prices', value: 'prices' },
+        { name: '✏️ Edit Metadata', value: 'edit-metadata' },
+        { name: '👥 View Subscriptions', value: 'subscriptions' },
+        { name: '🔄 Run Subscription Reconciliation', value: 'reconcile' },
+        { name: '❌ Delete Product', value: 'delete-product' },
+        { name: '❓ Help & Info', value: 'help' },
+        { name: '👋 Exit', value: 'exit' }
+      ]
+    }
+  ]);
+  
+  switch (choice) {
+    case 'prices':
+      await viewPricesCommand({ all: false });
+      break;
+    case 'products':
+      await viewProductsCommand({ all: false });
+      break;
+    case 'subscriptions':
+      await viewSubscriptionsCommand();
+      break;
+    case 'inactive-products':
+      await viewInactiveProductsCommand();
+      break;
+    case 'create-product':
+      await createProductCommand();
+      break;
+    case 'reconcile':
+      await reconciliationCommand.action();
+      break;
+    case 'edit':
+      await editMetadataCommand();
+      break;
+    case 'activate':
+      await activatePriceCommand();
+      break;
+    case 'deactivate':
+      await deactivatePriceCommand();
+      break;
+    case 'delete':
+      await deleteProductCommand();
+      break;
+    case 'help':
+      showHelp();
+      break;
+    case 'exit':
+      console.log(chalk.green('\n👋 Thank you for using the Stripe CLI!'));
+      return;
+  }
+  
+  // Prompt for return to main menu
+  const { returnToMenu } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'returnToMenu',
+      message: '🔙 Return to main menu?',
+      default: true
+    }
+  ]);
+  
+  if (returnToMenu) {
+    await showMainMenu();
+  } else {
+    console.log(chalk.green('\n👋 Thank you for using the Stripe CLI!'));
+  }
+}
+
+// Function to display help information
+function showHelp() {
+  clear();
+  console.log(boxen(
+    chalk.bold('💳 Stripe CLI Help 📚') + '\n\n' +
+    '🔍 View prices - List and select prices to view details\n' +
+    '📦 Manage products - View and manage products grouped by app\n' +
+    '🔄 Inactive products - View and manage deactivated products\n' +
+    '➕ Create product - Create new products with application categorization\n' +
+    '✏️ Edit metadata - Add custom data to prices\n' +
+    '✅ Activate - Make a price available for purchase\n' +
+    '🚫 Deactivate - Hide a price from customers\n' +
+    '❌ Delete product - Permanently remove a product and its prices\n\n' +
+    chalk.cyan('For more information, visit: https://stripe.com/docs'),
+    { padding: 1, margin: 1, borderColor: 'blue' }
+  ));
+}
+
+// Command handler wrappers for menu integration
+async function viewPricesCommand(options) {
+  const selectedPrice = await listAndSelectPrice(null, options.all);
+  if (selectedPrice) {
+    await showPriceDetails(selectedPrice.id);
+  }
+}
+
+async function viewProductsCommand(options) {
+  const selectedProduct = await listAndSelectProduct(options.all);
+  
+  if (selectedProduct) {
+    // Fetch complete product details
+    const spinner = ora('🔍 Fetching product details...').start();
+    try {
+      const product = await stripe.products.retrieve(selectedProduct.id);
+      spinner.succeed('✅ Product details fetched');
+      
+      console.log(boxen(prettyJson(product), {
+        padding: 1,
+        margin: 1,
+        borderColor: 'green',
+        title: `📦 Product: ${product.name}`
+      }));
+      
+      // Ask what to do with this product
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: '🛠️  What would you like to do with this product?',
+          choices: [
+            { name: '🔍 View prices for this product', value: 'prices' },
+            { name: '✏️  Edit product metadata', value: 'edit-metadata' },
+            { name: product.active ? '🚫 Deactivate product' : '✅ Activate product', value: 'toggle-active' },
+            { name: '➕ Create a new price for this product', value: 'create-price' },
+            { name: '🔙 Back', value: 'back' }
+          ]
+        }
+      ]);
+      
+      switch (action) {
+        case 'prices':
+          // Show prices for this product
+          const includeInactive = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'include',
+              message: '🔎 Include inactive prices?',
+              default: false
+            }
+          ]);
+          const selectedPrice = await listAndSelectPrice(product.id, includeInactive.include);
+          if (selectedPrice) {
+            await showPriceDetails(selectedPrice.id);
+          }
+          break;
+        
+        case 'edit-metadata':
+          // Edit product metadata
+          await editProductMetadata(product.id);
+          break;
+        
+        case 'toggle-active':
+          // Toggle product active status
+          await toggleProductActive(product.id, !product.active);
+          break;
+        
+        case 'create-price':
+          // Create new price for this product
+          await createNewPrice(product.id);
+          break;
+          
+        case 'back':
+        default:
+          // Return to main menu
+          break;
+      }
+    } catch (error) {
+      spinner.fail('❌ Failed to fetch product details');
+      console.error(chalk.red('Error:'), error.message);
+    }
+  }
+}
+
+async function viewInactiveProductsCommand() {
+  try {
+    console.log(chalk.blue('🔍 Fetching inactive products from Stripe...'));
+    
+    const spinner = ora('Loading inactive products...').start();
+    const productsResponse = await stripe.products.list({
+      limit: 100,
+      active: false
+    });
+    
+    if (productsResponse.data.length === 0) {
+      spinner.info('ℹ️ No inactive products found');
+      return;
+    }
+    
+    spinner.succeed(`✅ Found ${productsResponse.data.length} inactive products`);
+    
+    // Group products by app_name
+    const groupedProducts = {};
+    groupedProducts['Uncategorized'] = [];
+    
+    productsResponse.data.forEach(product => {
+      const appName = product.metadata?.app_name || 'Uncategorized';
+      if (!groupedProducts[appName]) {
+        groupedProducts[appName] = [];
+      }
+      groupedProducts[appName].push(product);
+    });
+    
+    // Display products grouped by app
+    console.log(chalk.blue('\n🗂️ Inactive Products by Application:\n'));
+    
+    const appsArray = Object.keys(groupedProducts).filter(appName => 
+      groupedProducts[appName].length > 0
+    );
+    
+    for (let i = 0; i < appsArray.length; i++) {
+      const appName = appsArray[i];
+      console.log(chalk.cyan(`\n[${i + 1}] ${appName}\n`));
+      
+      const table = new Table({
+        head: ['#', 'ID', 'Name', 'Created', 'Status'],
+        style: { head: ['cyan'] }
+      });
+      
+      const productsInApp = groupedProducts[appName];
+      productsInApp.forEach((product, index) => {
+        const createdDate = new Date(product.created * 1000).toLocaleDateString();
+        
+        table.push([
+          `${i + 1}.${index + 1}`,
+          product.id.substring(0, 10) + '...',
+          product.name,
+          createdDate,
+          chalk.red('🚫 Inactive')
+        ]);
+      });
+      
+      console.log(table.toString());
+    }
+    
+    if (appsArray.length === 0) {
+      console.log(chalk.yellow('ℹ️ No inactive products found'));
+      return;
+    }
+    
+    // Let user select an app first
+    const { appIndex } = await inquirer.prompt([
+      {
+        type: 'number',
+        name: 'appIndex',
+        message: '🔢 Select an application by number:',
+        validate: (value) => {
+          const num = parseInt(value);
+          return num > 0 && num <= appsArray.length
+            ? true
+            : `Please enter a number between 1 and ${appsArray.length}`;
+        }
+      }
+    ]);
+    
+    const selectedAppName = appsArray[appIndex - 1];
+    const productsInSelectedApp = groupedProducts[selectedAppName];
+    
+    // Then let user select a product within that app
+    const { productIndex } = await inquirer.prompt([
+      {
+        type: 'number',
+        name: 'productIndex',
+        message: `🔢 Select a product from ${selectedAppName} by number (after decimal point):`,
+        validate: (value) => {
+          const num = parseInt(value);
+          return num > 0 && num <= productsInSelectedApp.length
+            ? true
+            : `Please enter a number between 1 and ${productsInSelectedApp.length}`;
+        }
+      }
+    ]);
+    
+    const selectedProduct = productsInSelectedApp[productIndex - 1];
+    
+    // Show product details and actions
+    console.log(boxen(prettyJson(selectedProduct), {
+      padding: 1,
+      margin: 1,
+      borderColor: 'yellow',
+      title: `🚫 Inactive Product: ${selectedProduct.name}`
+    }));
+    
+    // Ask what to do with this inactive product
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: '🛠️ What would you like to do with this inactive product?',
+        choices: [
+          { name: '✅ Activate product', value: 'activate' },
+          { name: '❌ Delete product permanently', value: 'delete' },
+          { name: '🔍 View associated prices', value: 'prices' },
+          { name: '✏️ Edit product metadata', value: 'edit-metadata' },
+          { name: '🔙 Back', value: 'back' }
+        ]
+      }
+    ]);
+    
+    switch (action) {
+      case 'activate':
+        await toggleProductActive(selectedProduct.id, true);
+        break;
+        
+      case 'delete':
+        await deleteProduct(selectedProduct.id);
+        break;
+        
+      case 'prices':
+        // Show prices for this product
+        const selectedPrice = await listAndSelectPrice(selectedProduct.id, true);
+        if (selectedPrice) {
+          await showPriceDetails(selectedPrice.id);
+        }
+        break;
+        
+      case 'edit-metadata':
+        await editProductMetadata(selectedProduct.id);
+        break;
+        
+      case 'back':
+      default:
+        // Return to main menu
+        break;
+    }
+  } catch (error) {
+    console.error(chalk.red('❌ Error:'), error.message);
+  }
+}
+
+async function createProductCommand() {
+  try {
+    console.log(chalk.blue('➕ Create a new product in Stripe'));
+    
+    // Get existing apps/categories for reference
+    const spinner = ora('🔍 Fetching existing products for reference...').start();
+    let existingApps = ['Uncategorized'];
+    
+    try {
+      const products = await stripe.products.list({ limit: 100 });
+      const appMap = new Map();
+      
+      products.data.forEach(product => {
+        if (product.metadata?.app_name) {
+          appMap.set(product.metadata.app_name, true);
+        }
+      });
+      
+      if (appMap.size > 0) {
+        existingApps = ['Uncategorized', ...Array.from(appMap.keys())];
+      }
+      
+      spinner.succeed('✅ Found existing applications');
+    } catch (error) {
+      spinner.fail('❌ Failed to fetch products');
+      console.log(chalk.yellow('⚠️ Continuing with new product creation...'));
+    }
+    
+    // Get product details
+    const productDetails = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'name',
+        message: '📝 Product name:',
+        validate: value => value.trim() !== '' ? true : 'Product name is required'
+      },
+      {
+        type: 'input',
+        name: 'description',
+        message: '📝 Product description (optional):',
+      },
+      {
+        type: 'list',
+        name: 'app_choice',
+        message: '🗂️ Select an application category:',
+        choices: [...existingApps, 'Create new application category']
+      }
+    ]);
+    
+    let appName = productDetails.app_choice;
+    if (appName === 'Create new application category') {
+      const { newAppName } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'newAppName',
+          message: '🏷️ Enter new application name:',
+          validate: value => value.trim() !== '' ? true : 'Application name is required'
+        }
+      ]);
+      appName = newAppName;
+    } else if (appName === 'Uncategorized') {
+      appName = undefined;
+    }
+    
+    // Ask for additional metadata
+    const { addMetadata } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'addMetadata',
+        message: '🔧 Would you like to add additional metadata to this product?',
+        default: false
+      }
+    ]);
+    
+    let metadata = appName ? { app_name: appName } : {};
+    
+    if (addMetadata) {
+      console.log(chalk.yellow('📋 Current metadata:'));
+      console.log(prettyJson(metadata));
+      
+      const additionalMetadata = await editJsonInEditor(metadata);
+      metadata = additionalMetadata || metadata;
+    }
+    
+    // Create product
+    const createSpinner = ora('🛠️ Creating product...').start();
+    const product = await stripe.products.create({
+      name: productDetails.name,
+      description: productDetails.description || undefined,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined
+    });
+    
+    createSpinner.succeed('✅ Product created successfully');
+    console.log(boxen(prettyJson(product), {
+      padding: 1,
+      margin: 1,
+      borderColor: 'green',
+      title: `✨ New Product: ${product.name}`
+    }));
+    
+    // Ask if user wants to create a price for this product
+    const { createPrice } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'createPrice',
+        message: '💰 Would you like to create a price for this product now?',
+        default: true
+      }
+    ]);
+    
+    if (createPrice) {
+      await createNewPrice(product.id);
+    }
+    
+  } catch (error) {
+    console.error(chalk.red('❌ Error creating product:'), error.message);
+  }
+}
+
+async function editMetadataCommand() {
+  const selectedPrice = await listAndSelectPrice();
+  
+  if (selectedPrice) {
+    await editPriceMetadata(selectedPrice.id);
+  }
+}
+
+async function activatePriceCommand() {
+  console.log(chalk.blue('✅ Activate an inactive price'));
+  
+  const selectedPrice = await listAndSelectPrice(null, true, false);
+  if (selectedPrice && !selectedPrice.active) {
+    await togglePriceActive(selectedPrice.id, true);
+  } else if (selectedPrice && selectedPrice.active) {
+    console.log(chalk.yellow('⚠️ This price is already active'));
+  }
+}
+
+async function deactivatePriceCommand() {
+  console.log(chalk.blue('🚫 Deactivate an active price'));
+  
+  const selectedPrice = await listAndSelectPrice(null, true, true);
+  if (selectedPrice && selectedPrice.active) {
+    await togglePriceActive(selectedPrice.id, false);
+  } else if (selectedPrice && !selectedPrice.active) {
+    console.log(chalk.yellow('⚠️ This price is already inactive'));
+  }
+}
+
+async function viewSubscriptionsCommand() {
+  try {
+    clear();
+    console.log(chalk.blue('👥 View and filter Stripe subscriptions\n'));
+    
+    // Initial loading of subscriptions
+    const spinner = ora('🔍 Loading subscriptions from Stripe...').start();
+    
+    try {
+      // Fetch subscriptions with minimal expansion to avoid Stripe API limits
+      const subscriptionsResponse = await stripe.subscriptions.list({
+        limit: 100,
+        expand: ['data.customer']
+      });
+      
+      if (subscriptionsResponse.data.length === 0) {
+        spinner.info('ℹ️ No subscriptions found');
+        return;
+      }
+      
+      spinner.succeed(`✅ Found ${subscriptionsResponse.data.length} subscriptions`);
+      
+      // Ask if user wants to filter the subscriptions
+      const { filterChoice } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'filterChoice',
+          message: '🔎 Would you like to filter the subscriptions?',
+          choices: [
+            { name: 'Show all subscriptions', value: 'none' },
+            { name: 'Filter by customer email', value: 'email' },
+            { name: 'Filter by subscription date', value: 'date' },
+            { name: 'Filter by status', value: 'status' }
+          ]
+        }
+      ]);
+      
+      let filteredSubscriptions = [...subscriptionsResponse.data];
+      
+      // Apply filters based on user choice
+      switch (filterChoice) {
+        case 'email':
+          const { emailQuery } = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'emailQuery',
+              message: '📧 Enter email filter (partial match is supported):',
+              validate: value => value.trim() !== '' ? true : 'Please enter an email filter'
+            }
+          ]);
+          
+          filteredSubscriptions = filteredSubscriptions.filter(subscription => {
+            if (subscription.customer && subscription.customer.email) {
+              return subscription.customer.email.toLowerCase().includes(emailQuery.toLowerCase());
+            }
+            return false;
+          });
+          
+          console.log(chalk.green(`🔍 Filtered to ${filteredSubscriptions.length} subscriptions matching email: "${emailQuery}"`));
+          break;
+          
+        case 'date':
+          const { dateOperation, dateValue } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'dateOperation',
+              message: '📅 Select date filter operation:',
+              choices: [
+                { name: 'Created before', value: 'before' },
+                { name: 'Created after', value: 'after' }
+              ]
+            },
+            {
+              type: 'input',
+              name: 'dateValue',
+              message: '📅 Enter date (YYYY-MM-DD):',
+              validate: (value) => {
+                // Simple date validation
+                const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                if (!dateRegex.test(value)) {
+                  return 'Please enter a valid date in YYYY-MM-DD format';
+                }
+                return true;
+              }
+            }
+          ]);
+          
+          const filterDate = new Date(dateValue);
+          const filterTimestamp = Math.floor(filterDate.getTime() / 1000); // Convert to Unix timestamp (seconds)
+          
+          filteredSubscriptions = filteredSubscriptions.filter(subscription => {
+            if (dateOperation === 'before') {
+              return subscription.created < filterTimestamp;
+            } else { // 'after'
+              return subscription.created > filterTimestamp;
+            }
+          });
+          
+          console.log(chalk.green(`🔍 Filtered to ${filteredSubscriptions.length} subscriptions ${dateOperation} ${dateValue}`));
+          break;
+          
+        case 'status':
+          const { statusFilter } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'statusFilter',
+              message: '📡 Select subscription status:',
+              choices: [
+                { name: '✅ Active', value: 'active' },
+                { name: '⏸️ Trialing', value: 'trialing' },
+                { name: '💸 Past due', value: 'past_due' },
+                { name: '❌ Canceled', value: 'canceled' },
+                { name: '⏹ Unpaid', value: 'unpaid' },
+                { name: '⏳ Incomplete', value: 'incomplete' },
+                { name: '🚫 Incomplete expired', value: 'incomplete_expired' }
+              ]
+            }
+          ]);
+          
+          filteredSubscriptions = filteredSubscriptions.filter(subscription => 
+            subscription.status === statusFilter
+          );
+          
+          console.log(chalk.green(`🔍 Filtered to ${filteredSubscriptions.length} subscriptions with status: ${statusFilter}`));
+          break;
+      }
+      
+      if (filteredSubscriptions.length === 0) {
+        console.log(chalk.yellow('\n⚠️ No subscriptions match the selected filter'));
+        return;
+      }
+      
+      // Display subscriptions in a table
+      console.log(chalk.blue('\n📊 Subscription List:\n'));
+      
+      const table = new Table({
+        head: ['#', 'Customer', 'Plan', 'Status', 'Created', 'Current Period'],
+        style: { head: ['cyan'] },
+        colWidths: [5, 30, 25, 15, 15, 25]
+      });
+      
+      // Fetch price details for each subscription separately to get plan names
+      const subscriptionPlanNames = {};
+      
+      // Process all subscriptions to extract plan names
+      for (const subscription of filteredSubscriptions) {
+        if (subscription.items.data.length > 0) {
+          const firstItem = subscription.items.data[0];
+          if (firstItem.price) {
+            try {
+              // Fetch price details including product
+              const price = await stripe.prices.retrieve(firstItem.price.id, {
+                expand: ['product']
+              });
+              
+              // Get plan name from product name, price nickname, or metadata
+              if (price.product && price.product.name) {
+                subscriptionPlanNames[subscription.id] = price.product.name;
+              } else if (price.nickname) {
+                subscriptionPlanNames[subscription.id] = price.nickname;
+              } else if (price.metadata && price.metadata.plan_name) {
+                subscriptionPlanNames[subscription.id] = price.metadata.plan_name;
+              }
+            } catch (error) {
+              console.error(chalk.yellow(`⚠️ Could not fetch price details for subscription ${subscription.id}: ${error.message}`));
+            }
+          }
+        }
+        
+        // If we couldn't determine the plan name, use a default
+        if (!subscriptionPlanNames[subscription.id]) {
+          subscriptionPlanNames[subscription.id] = 'Unknown Plan';
+        }
+      }
+      
+      // Now display the subscriptions with their plan names
+      filteredSubscriptions.forEach((subscription, index) => {
+        const createdDate = new Date(subscription.created * 1000).toLocaleDateString();
+        const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toLocaleDateString();
+        
+        // Use the fetched plan name
+        const planName = subscriptionPlanNames[subscription.id];
+        
+        // Determine customer email
+        const customerEmail = subscription.customer && subscription.customer.email 
+          ? subscription.customer.email 
+          : 'Unknown';
+        
+        // Determine status color
+        let statusColor;
+        switch (subscription.status) {
+          case 'active':
+            statusColor = chalk.green(`\u2705 ${subscription.status}`);
+            break;
+          case 'trialing':
+            statusColor = chalk.blue(`\u23f8\ufe0f ${subscription.status}`);
+            break;
+          case 'past_due':
+            statusColor = chalk.yellow(`\ud83d\udcb8 ${subscription.status}`);
+            break;
+          case 'canceled':
+            statusColor = chalk.red(`\u274c ${subscription.status}`);
+            break;
+          default:
+            statusColor = chalk.gray(`${subscription.status}`);
+        }
+        
+        table.push([
+          index + 1,
+          customerEmail,
+          planName,
+          statusColor,
+          createdDate,
+          currentPeriodEnd
+        ]);
+      });
+      
+      console.log(table.toString());
+      
+      // Allow selection of a subscription to view details
+      const { viewDetails } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'viewDetails',
+          message: '🔍 View detailed information for a subscription?',
+          default: false
+        }
+      ]);
+      
+      if (viewDetails) {
+        const { subscriptionIndex } = await inquirer.prompt([
+          {
+            type: 'number',
+            name: 'subscriptionIndex',
+            message: '🔢 Select subscription by number:',
+            validate: (value) => {
+              const num = parseInt(value);
+              return num > 0 && num <= filteredSubscriptions.length
+                ? true
+                : `Please enter a number between 1 and ${filteredSubscriptions.length}`;
+            }
+          }
+        ]);
+        
+        const selectedSubscription = filteredSubscriptions[subscriptionIndex - 1];
+        
+        // Display full subscription details
+        console.log(boxen(prettyJson(selectedSubscription), {
+          padding: 1,
+          margin: 1,
+          borderColor: 'blue',
+          title: `🎟️ Subscription Details`
+        }));
+        
+        // Offer actions for the subscription
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: '🛠️ What would you like to do with this subscription?',
+            choices: [
+              { name: '📨 Send receipt by email', value: 'receipt' },
+              { name: '📑 View invoices', value: 'invoices' },
+              { name: '🔙 Back', value: 'back' }
+            ]
+          }
+        ]);
+        
+        // Handle subscription actions (future implementation)
+        switch (action) {
+          case 'receipt':
+            console.log(chalk.yellow('\n⚠️ Email receipt functionality is not yet implemented'));
+            break;
+            
+          case 'invoices':
+            console.log(chalk.yellow('\n⚠️ Invoice viewing functionality is not yet implemented'));
+            break;
+            
+          case 'back':
+          default:
+            // Return to main menu
+            break;
+        }
+      }
+      
+    } catch (error) {
+      spinner.fail(`❌ Error loading subscriptions: ${error.message}`);
+      console.error(chalk.red('Error details:'), error);
+    }
+    
+  } catch (error) {
+    console.error(chalk.red('❌ Error:'), error.message);
+  }
+}
+
+async function deleteProductCommand() {
+  try {
+    console.log(chalk.red('⚠️  WARNING: This will permanently delete a product and all its prices ⚠️'));
+    console.log(chalk.yellow('This action cannot be undone and will remove all data from Stripe.'));
+    
+    const { confirm } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirm',
+        message: '⚠️ Do you understand the risks and want to continue?',
+        default: false
+      }
+    ]);
+    
+    if (!confirm) {
+      console.log(chalk.blue('✋ Operation cancelled'));
+      return;
+    }
+    
+    // Include both active and inactive products
+    console.log(chalk.yellow('🔍 Select a product to delete:'));
+    const selectedProduct = await listAndSelectProduct(true);
+    
+    if (selectedProduct) {
+      await deleteProduct(selectedProduct.id);
+    }
+  } catch (error) {
+    console.error(chalk.red('❌ Error:'), error.message);
+  }
+}
+
+// Process command line arguments and show menu
 program.parse(process.argv);
+
+// If no command was specified or interactive mode, show main menu
+if (program.opts().interactive || program.opts().menu || process.argv.length <= 2) {
+  (async () => {
+    await showMainMenu();
+  })();
+}
