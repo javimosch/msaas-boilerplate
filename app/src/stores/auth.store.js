@@ -33,15 +33,21 @@ export const useAuthStore = defineStore('auth', () => {
       
       const response = await authService.login(credentials);
       
+      // Extract data from nested response structure
+      const { user, tokens } = response.data || response;
+      
       // Store tokens and user data
-      token.value = response.token;
-      refreshToken.value = response.refreshToken;
-      user.value = response.user;
+      token.value = tokens?.accessToken || response.token;
+      refreshToken.value = tokens?.refreshToken || response.refreshToken;
+      user.value = user || response.user;
       
       // Persist tokens
-      tokenService.setTokens(response.token, response.refreshToken);
+      tokenService.setTokens(
+        tokens?.accessToken || response.token,
+        tokens?.refreshToken || response.refreshToken
+      );
       
-      console.debug('Login successful', { userId: user.value?.id });
+      console.debug('Login successful', { userId: user.value?._id || user.value?.id });
       
       return response;
     } catch (err) {
@@ -62,15 +68,21 @@ export const useAuthStore = defineStore('auth', () => {
       
       const response = await authService.register(userData);
       
+      // Extract data from nested response structure
+      const { user, tokens } = response.data || response;
+      
       // Store tokens and user data
-      token.value = response.token;
-      refreshToken.value = response.refreshToken;
-      user.value = response.user;
+      token.value = tokens?.accessToken || response.token;
+      refreshToken.value = tokens?.refreshToken || response.refreshToken;
+      user.value = user || response.user;
       
       // Persist tokens
-      tokenService.setTokens(response.token, response.refreshToken);
+      tokenService.setTokens(
+        tokens?.accessToken || response.token,
+        tokens?.refreshToken || response.refreshToken
+      );
       
-      console.debug('Registration successful', { userId: user.value?.id });
+      console.debug('Registration successful', { userId: user.value?._id || user.value?.id });
       
       return response;
     } catch (err) {
@@ -117,12 +129,18 @@ export const useAuthStore = defineStore('auth', () => {
       
       const response = await authService.refreshToken(refreshToken.value);
       
+      // Extract data from nested response structure
+      const { tokens } = response.data || response;
+      
       // Update tokens
-      token.value = response.token;
-      refreshToken.value = response.refreshToken;
+      token.value = tokens?.accessToken || response.token;
+      refreshToken.value = tokens?.refreshToken || response.refreshToken;
       
       // Persist new tokens
-      tokenService.setTokens(response.token, response.refreshToken);
+      tokenService.setTokens(
+        tokens?.accessToken || response.token,
+        tokens?.refreshToken || response.refreshToken
+      );
       
       console.debug('Tokens refreshed successfully');
       
