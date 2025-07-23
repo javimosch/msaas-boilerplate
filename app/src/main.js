@@ -7,6 +7,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import { appConfig } from './config/app.config';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Debug log for application startup
 console.debug('Starting MSaaS application', {
@@ -23,7 +24,6 @@ const pinia = createPinia();
 
 // Install plugins
 app.use(pinia);
-app.use(router);
 
 // Global properties
 app.config.globalProperties.$appConfig = appConfig;
@@ -53,11 +53,41 @@ if (appConfig.app.debugMode) {
   };
 }
 
-// Mount the app
-app.mount('#app');
+// Initialize authentication and mount the app
+const initializeApp = async () => {
+  try {
+    // Initialize authentication before mounting
+    const authStore = useAuthStore();
+    await authStore.initializeAuth();
+    
+    console.debug('Authentication initialized successfully');
+    
+    // Install router after auth initialization
+    app.use(router);
+    
+    // Mount the app
+    app.mount('#app');
+    
+    console.debug('MSaaS application mounted successfully', {
+      mountedAt: '#app',
+      routerReady: !!router,
+      storeReady: !!pinia,
+      authReady: true
+    });
+  } catch (error) {
+    console.error('Failed to initialize application:', {
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // Even if auth initialization fails, mount the app
+    // so users can still access public routes
+    app.use(router);
+    app.mount('#app');
+    
+    console.debug('MSaaS application mounted with auth initialization error');
+  }
+};
 
-console.debug('MSaaS application mounted successfully', {
-  mountedAt: '#app',
-  routerReady: !!router,
-  storeReady: !!pinia
-});
+// Start the application
+initializeApp();

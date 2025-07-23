@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "dev": "nodemon src/index.js --ignore logs --watch src --watch .env -e js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

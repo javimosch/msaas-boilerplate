@@ -2,7 +2,7 @@
  * Subscription Service
  * Handles API calls related to subscriptions and billing
  */
-import { apiClient } from './api';
+import { apiService } from './api';
 
 class SubscriptionService {
   /**
@@ -10,7 +10,7 @@ class SubscriptionService {
    * @returns {Promise} - The plans response
    */
   async getPlans() {
-    return apiClient.get('/api/subscriptions/plans');
+    return apiService.get('/api/subscriptions/plans');
   }
   
   /**
@@ -18,7 +18,7 @@ class SubscriptionService {
    * @returns {Promise} - The subscription status response
    */
   async getSubscriptionStatus() {
-    return apiClient.get('/api/subscriptions/status');
+    return apiService.get('/api/subscriptions/status');
   }
   
   /**
@@ -27,7 +27,7 @@ class SubscriptionService {
    * @returns {Promise} - The checkout session response
    */
   async createCheckoutSession(priceId) {
-    return apiClient.post('/api/subscriptions/create-checkout-session', { priceId });
+    return apiService.post('/api/subscriptions/create-checkout-session', { priceId });
   }
   
   /**
@@ -35,7 +35,7 @@ class SubscriptionService {
    * @returns {Promise} - The cancellation response
    */
   async cancelSubscription() {
-    return apiClient.delete('/api/subscriptions/cancel');
+    return apiService.delete('/api/subscriptions/cancel');
   }
 }
 
