@@ -86,9 +86,11 @@ class AuthService {
   async getCurrentUser() {
     console.debug('AuthService: Get current user');
     
-    const response = await apiService.get('/api/user/me');
+    const response = await apiService.get('/api/user/profile');
+
+    response = response.data.user;
     
-    console.debug('AuthService: Current user retrieved', { userId: response.id });
+    console.debug('AuthService: Current user retrieved', { userId: response._id, data: response });
     return response;
   }
 

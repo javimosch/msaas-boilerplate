@@ -37,7 +37,14 @@ async function startServer() {
     app.use('/api/webhooks', webhookRoutes);
 
     //Point app routes to app
-    app.use('/*', (req, res) => {
+    app.use('/*', (req, res, next) => {
+
+      //if req url contains "api", do next 
+      if(req.url.includes('api')) {
+        next();
+        return;
+      }
+
       //if no ext and route is an app route
       const appRoutes = ['/dashboard','/billing']
       if (!req.url.includes('.') && appRoutes.includes(req.url)) {
@@ -58,6 +65,8 @@ async function startServer() {
           //send app index.html
           res.sendFile(path.join(process.cwd(), 'app', 'dist', 'index.html'));
         }
+      }else{
+        next();
       }
     });
     
