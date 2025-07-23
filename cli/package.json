@@ -1,0 +1,23 @@
+{
+  "name": "stripe-cli",
+  "version": "1.0.0",
+  "description": "Interactive CLI for Stripe price management",
+  "main": "stripe-cli.js",
+  "scripts": {
+    "start": "node stripe-cli.js"
+  },
+  "bin": {
+    "stripe-cli": "./stripe-cli.js"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^9.4.0",
+    "dotenv": "^16.0.3",
+    "inquirer": "^8.2.4",
+    "ora": "^5.4.1",
+    "stripe": "^12.0.0",
+    "boxen": "^5.1.2",
+    "cli-table3": "^0.6.3",
+    "json-colorizer": "^2.2.2"
+  }
+}
