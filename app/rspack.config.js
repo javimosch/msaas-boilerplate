@@ -1,14 +1,42 @@
 const path = require('path');
 const rspack = require('@rspack/core');
 const { VueLoaderPlugin } = require('vue-loader');
-const { HtmlRspackPlugin } = rspack;
+const { HtmlRspackPlugin, DefinePlugin } = rspack;
+
+// Filter VUE_APP_* environment variables
+const vueAppEnv = {};
+Object.keys(process.env).forEach(key => {
+  if (key.startsWith('VUE_APP_')) {
+    vueAppEnv[key] = JSON.stringify(process.env[key]);
+  }
+});
 
 module.exports = {
-  mode: 'development',
   entry: './src/main.js',
+  mode: process.env.NODE_ENV || 'development',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[contenthash].js',
+  },
+  devServer: {
+    port: 3001,
+    hot: true,
+    historyApiFallback: true,
+    open: true,
+    compress: true,
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+      },
+    },
+  },
+  resolve: {
+    extensions: ['.js', '.vue', '.json'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      'vue': 'vue/dist/vue.esm-bundler.js',
+    },
   },
   module: {
     rules: [
@@ -44,16 +72,11 @@ module.exports = {
     new HtmlRspackPlugin({
       template: './public/index.html',
     }),
+    new DefinePlugin({
+      'process.env': {
+        NODE_ENV: JSON.stringify(process.env.NODE_ENV || 'development'),
+        ...vueAppEnv,
+      },
+    }),
   ],
-  resolve: {
-    extensions: ['.js', '.vue', '.json'],
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-    },
-  },
-  devServer: {
-    port: 3001,
-    hot: true,
-    open: true,
-  },
 };

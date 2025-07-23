@@ -1,0 +1,11 @@
+
+
+services:
+  app:
+    build: .
+    image: javimosch/msaas-boilerplate
+    ports:
+      - "3060:3000"
+    volumes:
+      - .:/app
+    working_dir: /app

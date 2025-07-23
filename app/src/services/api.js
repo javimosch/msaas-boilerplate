@@ -1,73 +1,228 @@
 /**
- * API service module
- * Contains functions for making API requests
+ * API Service Module
+ * Comprehensive HTTP client using Axios with interceptors and error handling
  */
-import { getEnvVar } from '../utils/helpers';
+import axios from 'axios';
+import { appConfig } from '@/config/app.config';
+import { tokenService } from './token.service';
+import { useAuthStore } from '@/stores/auth.store';
+import { useAppStore } from '@/stores/app.store';
 
-// Get base API URL from environment variables
-const API_BASE_URL = getEnvVar('VUE_APP_API_URL', 'http://localhost:3001');
+// Create axios instance with default configuration
+const apiClient = axios.create({
+  baseURL: appConfig.api.baseUrl,
+  timeout: appConfig.api.timeout,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
-// Debug log for API initialization
-console.debug('Initializing API service with base URL', { API_BASE_URL });
-
-/**
- * Make a GET request to the API
- * @param {string} endpoint - API endpoint
- * @param {Object} options - Fetch options
- * @returns {Promise<any>} - Response data
- */
-export const fetchData = async (endpoint, options = {}) => {
-  console.debug('Fetching data from API', { endpoint, options });
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-      },
-      ...options
-    });
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = tokenService.getToken();
     
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
-    return await response.json();
-  } catch (error) {
-    console.debug('API fetch error', { endpoint, error: error.message });
-    throw error;
-  }
-};
-
-/**
- * Post data to the API
- * @param {string} endpoint - API endpoint
- * @param {Object} data - Data to send
- * @param {Object} options - Fetch options
- * @returns {Promise<any>} - Response data
- */
-export const postData = async (endpoint, data, options = {}) => {
-  console.debug('Posting data to API', { endpoint, data, options });
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-      },
-      body: JSON.stringify(data),
-      ...options
+    console.debug('API Request', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      hasAuth: !!token
     });
     
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+    return config;
+  },
+  (error) => {
+    console.debug('Request interceptor error', { error: error.message });
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for error handling and token refresh
+apiClient.interceptors.response.use(
+  (response) => {
+    console.debug('API Response', {
+      status: response.status,
+      url: response.config.url
+    });
+    
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    console.debug('API Response Error', {
+      status: error.response?.status,
+      url: originalRequest?.url,
+      message: error.message
+    });
+    
+    // Handle 401 Unauthorized - attempt token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const authStore = useAuthStore();
+        await authStore.refreshTokens();
+        
+        // Retry original request with new token
+        const newToken = tokenService.getToken();
+        if (newToken) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.debug('Token refresh failed', { error: refreshError.message });
+        // Redirect to login will be handled by auth store
+      }
     }
     
-    return await response.json();
-  } catch (error) {
-    console.debug('API post error', { endpoint, error: error.message });
-    throw error;
+    // Handle other errors
+    const appStore = useAppStore();
+    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
+    
+    // Show error notification for non-auth errors
+    if (error.response?.status !== 401) {
+      appStore.showError(errorMessage);
+    }
+    
+    return Promise.reject(error);
   }
+);
+
+/**
+ * API Service Class
+ * Provides methods for common HTTP operations
+ */
+class ApiService {
+  /**
+   * GET request
+   * @param {string} endpoint - API endpoint
+   * @param {Object} config - Axios config
+   * @returns {Promise} - Response data
+   */
+  async get(endpoint, config = {}) {
+    try {
+      const response = await apiClient.get(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * POST request
+   * @param {string} endpoint - API endpoint
+   * @param {Object} data - Request data
+   * @param {Object} config - Axios config
+   * @returns {Promise} - Response data
+   */
+  async post(endpoint, data = {}, config = {}) {
+    try {
+      const response = await apiClient.post(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * PUT request
+   * @param {string} endpoint - API endpoint
+   * @param {Object} data - Request data
+   * @param {Object} config - Axios config
+   * @returns {Promise} - Response data
+   */
+  async put(endpoint, data = {}, config = {}) {
+    try {
+      const response = await apiClient.put(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * PATCH request
+   * @param {string} endpoint - API endpoint
+   * @param {Object} data - Request data
+   * @param {Object} config - Axios config
+   * @returns {Promise} - Response data
+   */
+  async patch(endpoint, data = {}, config = {}) {
+    try {
+      const response = await apiClient.patch(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * DELETE request
+   * @param {string} endpoint - API endpoint
+   * @param {Object} config - Axios config
+   * @returns {Promise} - Response data
+   */
+  async delete(endpoint, config = {}) {
+    try {
+      const response = await apiClient.delete(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Handle API errors
+   * @param {Error} error - Axios error
+   * @returns {Error} - Formatted error
+   */
+  handleError(error) {
+    const message = error.response?.data?.message || error.message || 'An error occurred';
+    const status = error.response?.status;
+    const code = error.response?.data?.code || error.code;
+    
+    const formattedError = new Error(message);
+    formattedError.status = status;
+    formattedError.code = code;
+    formattedError.originalError = error;
+    
+    return formattedError;
+  }
+
+  /**
+   * Set default headers
+   * @param {Object} headers - Headers to set
+   */
+  setHeaders(headers) {
+    Object.assign(apiClient.defaults.headers, headers);
+  }
+
+  /**
+   * Get axios instance for advanced usage
+   * @returns {AxiosInstance} - Axios instance
+   */
+  getInstance() {
+    return apiClient;
+  }
+}
+
+// Create and export singleton instance
+export const apiService = new ApiService();
+
+// Export individual methods for convenience
+export const { get, post, put, patch, delete: del } = apiService;
+
+// Legacy exports for backward compatibility
+export const fetchData = (endpoint, options = {}) => {
+  return apiService.get(endpoint, options);
 };
+
+export const postData = (endpoint, data, options = {}) => {
+  return apiService.post(endpoint, data, options);
+};
+
+export default apiService;

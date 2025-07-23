@@ -1,85 +1,99 @@
 /**
- * Utility functions for the application
+ * Utility Helper Functions
+ * Comprehensive collection of utility functions for the MSaaS application
  */
 
 /**
- * Gets a formatted date string
- * @param {Date} [date=new Date()] - Date to format
- * @returns {string} - Formatted date string
+ * Get environment variable with fallback
+ * @param {string} key - Environment variable key
+ * @param {string} defaultValue - Default value if env var is not found
+ * @returns {string} - Environment variable value or default
  */
-export const getFormattedDate = (date = new Date()) => {
-  // Debug the incoming parameter
-  console.debug('getFormattedDate called with', { date });
-  
-  try {
-    return date instanceof Date 
-      ? date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })
-      : 'Invalid Date';
-  } catch (error) {
-    console.debug('Error formatting date', { error });
-    return 'Invalid Date';
-  }
+export const getEnvVar = (key, defaultValue = '') => {
+  return process.env[key] || defaultValue;
 };
 
 /**
- * Safely access nested object properties with optional chaining
- * @param {Object} obj - The object to access
- * @param {string} path - Path to the property (dot notation)
- * @param {*} defaultValue - Default value if property doesn't exist
- * @returns {*} - The property value or default value
+ * Get formatted current date
+ * @param {Date} date - Date to format (defaults to current date)
+ * @param {Object} options - Intl.DateTimeFormat options
+ * @returns {string} - Formatted date string
  */
-export const getNestedValue = (obj, path, defaultValue = '') => {
-  console.debug('getNestedValue called', { obj, path, defaultValue });
+export const getFormattedDate = (date = new Date(), options = {}) => {
+  const defaultOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  };
   
-  if (!obj || !path) return defaultValue;
-  
-  const keys = path.split('.');
-  let result = obj;
-  
-  for (const key of keys) {
-    result = result?.[key];
-    
-    if (result === undefined || result === null) {
-      console.debug('Property not found in path', { missingKey: key });
-      return defaultValue;
-    }
+  return date.toLocaleDateString('en-US', { ...defaultOptions, ...options });
+};
+
+/**
+ * Debounce function to limit function calls
+ * @param {Function} func - Function to debounce
+ * @param {number} delay - Delay in milliseconds
+ * @returns {Function} - Debounced function
+ */
+export const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
+  };
+};
+
+/**
+ * Format currency value
+ * @param {number} amount - Amount to format
+ * @param {string} currency - Currency code (default: USD)
+ * @returns {string} - Formatted currency string
+ */
+export const formatCurrency = (amount, currency = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency
+  }).format(amount);
+};
+
+/**
+ * Validate email format
+ * @param {string} email - Email to validate
+ * @returns {boolean} - True if valid email format
+ */
+export const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+/**
+ * Generate random ID
+ * @param {number} length - Length of ID (default: 8)
+ * @returns {string} - Random ID
+ */
+export const generateId = (length = 8) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
   return result;
 };
 
 /**
- * Get environment variable with fallback
- * @param {string} key - Environment variable name
- * @param {string} fallback - Fallback value
- * @returns {string} - Environment variable value or fallback
+ * Check if user is on mobile device
+ * @returns {boolean} - True if mobile device
  */
-export const getEnvVar = (key, fallback = '') => {
-  console.debug('Getting environment variable', { key, fallback });
-  return import.meta?.[key] || fallback;
+export const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
-/**
- * Debounce function to limit the rate at which a function can fire
- * @param {Function} func - The function to debounce
- * @param {number} wait - The delay in milliseconds
- * @returns {Function} - Debounced function
- */
-export const debounce = (func, wait = 300) => {
-  console.debug('Creating debounced function', { wait });
-  let timeout;
-  
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
+export default {
+  getEnvVar,
+  getFormattedDate,
+  debounce,
+  formatCurrency,
+  isValidEmail,
+  generateId,
+  isMobileDevice
 };

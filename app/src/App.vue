@@ -1,158 +1,303 @@
 <template>
-  <div class="app">
-    <h1>Rspack + Vue</h1>
+  <div id="app" :data-theme="appStore.theme">
+    <!-- Loading Overlay -->
+    <LoadingOverlay v-if="appStore.isLoading" :message="appStore.loadingMessage" />
     
-    <div class="card">
-      <p>This is a minimal Vue application bundled with Rspack</p>
-      <p>Fast Rust-based web bundler with webpack-compatible API</p>
-      <p>Today's date: <strong>{{ currentDate }}</strong></p>
-    </div>
+    <!-- Notification System -->
+    <NotificationContainer :notifications="appStore.notifications" />
     
-    <div class="card">
-      <h2>Features</h2>
-      <ul class="feature-list">
-        <li>Vue with SFC support</li>
-        <li>CSS processing</li>
-        <li>Fast Rust-based bundling</li>
-        <li>Hot Module Replacement</li>
-        <li>Component modularization</li>
-        <li>Environment variables</li>
-        <li>Utility functions</li>
-      </ul>
-    </div>
-    
-    <div class="action-container">
-      <div class="button-group">
-        <my-button :variant="theme" @click="incrementCount">
-          Regular Count: {{ count }}
-        </my-button>
-        
-        <my-button :variant="theme === 'primary' ? 'secondary' : 'primary'" @click="debouncedIncrement">
-          Debounced Count: {{ count }}
-        </my-button>
-      </div>
+    <!-- Main Application Layout -->
+    <div class="app-layout">
+      <!-- Navigation Header -->
+      <AppHeader v-if="showHeader" />
       
-      <my-button variant="outline" @click="toggleTheme">
-        Toggle Theme ({{ theme || 'primary' }})
-      </my-button>
+      <!-- Main Content Area -->
+      <main class="main-content" :class="{ 'with-header': showHeader }">
+        <router-view v-slot="{ Component }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
     </div>
-    
-    <p class="hint">
-      Edit <code>src/App.vue</code> and save to test HMR
-    </p>
   </div>
 </template>
 
 <script>
-import MyButton from './components/MyButton.vue';
-import { getFormattedDate, getEnvVar, debounce } from './utils/helpers';
+import { computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useAuthStore } from '@/stores/auth.store';
+import { useAppStore } from '@/stores/app.store';
+import LoadingOverlay from '@/components/ui/LoadingOverlay.vue';
+import NotificationContainer from '@/components/ui/NotificationContainer.vue';
+import AppHeader from '@/components/layout/AppHeader.vue';
 
 export default {
   name: 'App',
   components: {
-    MyButton
+    LoadingOverlay,
+    NotificationContainer,
+    AppHeader
   },
-  data() {
-    return {
-      count: 0,
-      theme: 'primary',
-      currentDate: getFormattedDate()
-    };
-  },
-  created() {
-    // Debug log for component creation lifecycle hook
-    console.debug('App component created', { 
-      count: this.count, 
-      theme: this.theme, 
-      currentDate: this.currentDate 
+  setup() {
+    const route = useRoute();
+    const authStore = useAuthStore();
+    const appStore = useAppStore();
+
+    // Computed properties
+    const showHeader = computed(() => {
+      // Hide header on auth pages and landing page
+      const hideHeaderRoutes = ['Login', 'Register', 'Home'];
+      return !hideHeaderRoutes.includes(route.name);
     });
-    
-    // Create debounced function
-    this.debouncedIncrement = debounce(this.incrementCount, 300);
-    
-    // Get environment variable using utility function
-    const apiUrl = getEnvVar('VUE_APP_API_URL', 'http://localhost:3001');
-    console.debug('API URL from env', { apiUrl });
-  },
-  methods: {
-    incrementCount() {
-      this.count++;
-      console.debug('Count incremented', { newCount: this.count });
-    },
-    toggleTheme() {
-      const themes = {
-        primary: 'secondary',
-        secondary: 'outline',
-        outline: 'primary'
-      };
+
+    // Initialize application
+    onMounted(async () => {
+      console.debug('App mounted, initializing...');
       
-      // Use optional chaining to safely access theme
-      this.theme = themes[this.theme] || 'primary';
-      console.debug('Theme toggled', { newTheme: this.theme });
-    }
+      try {
+        // Initialize app store (theme, preferences)
+        appStore.initializeApp();
+        
+        // Initialize authentication
+        await authStore.initializeAuth();
+        
+        console.debug('App initialization completed');
+      } catch (error) {
+        console.debug('App initialization failed', { error: error.message });
+        appStore.showError('Failed to initialize application');
+      }
+    });
+
+    return {
+      authStore,
+      appStore,
+      showHeader
+    };
   }
 };
 </script>
 
 <style>
+/* CSS Variables for theming */
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  /* Light theme colors */
+  --color-primary: #3b82f6;
+  --color-primary-dark: #2563eb;
+  --color-secondary: #64748b;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #06b6d4;
+  
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  
+  --border-radius: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+}
+
+/* Dark theme colors */
+[data-theme="dark"] {
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-border: #334155;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+}
+
+/* Global styles */
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  min-width: 320px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
   min-height: 100vh;
-  background-color: #f5f5f5;
-}
-
-.app {
-  text-align: center;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-}
-
-.card {
-  padding: 2em;
-  border-radius: 8px;
-  background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin: 1rem 0;
-}
-
-.feature-list {
-  text-align: left;
-  display: inline-block;
-}
-
-.action-container {
-  margin: 2rem 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
 }
 
-.button-group {
+.app-layout {
   display: flex;
-  justify-content: center;
-  gap: 1rem;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--color-background);
 }
 
-.hint {
-  font-size: 0.9rem;
-  color: #666;
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.3s ease;
 }
 
-code {
-  background-color: #f1f1f1;
-  padding: 0.2em 0.4em;
+.main-content.with-header {
+  padding-top: 4rem; /* Account for fixed header */
+}
+
+/* Page transitions */
+.page-enter-active,
+.page-leave-active {
+  transition: all 0.3s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+/* Utility classes */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+
+.text-sm { font-size: var(--font-size-sm); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-2xl { font-size: var(--font-size-2xl); }
+.text-3xl { font-size: var(--font-size-3xl); }
+
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+.text-error { color: var(--color-error); }
+
+.bg-primary { background-color: var(--color-primary); }
+.bg-surface { background-color: var(--color-surface); }
+.bg-background { background-color: var(--color-background); }
+
+.border { border: 1px solid var(--color-border); }
+.border-t { border-top: 1px solid var(--color-border); }
+.border-b { border-bottom: 1px solid var(--color-border); }
+.border-l { border-left: 1px solid var(--color-border); }
+.border-r { border-right: 1px solid var(--color-border); }
+
+.rounded { border-radius: var(--border-radius); }
+.rounded-lg { border-radius: var(--border-radius-lg); }
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
+
+.m-xs { margin: var(--spacing-xs); }
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.flex-1 { flex: 1; }
+
+.hidden { display: none; }
+.block { display: block; }
+.inline-block { display: inline-block; }
+
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .md\:hidden { display: none; }
+  .md\:block { display: block; }
+}
+
+@media (max-width: 640px) {
+  .sm\:hidden { display: none; }
+  .sm\:block { display: block; }
+  .sm\:text-sm { font-size: var(--font-size-sm); }
+}
+
+/* Focus styles for accessibility */
+*:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
   border-radius: 4px;
-  font-family: monospace;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }
 </style>
