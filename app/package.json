@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "rspack serve --mode development",
     "build": "rspack build --mode production",
+    "build:watch": "rspack build --mode development --watch",
     "preview": "rspack serve --mode production",
     "lint": "eslint src --ext .vue,.js",
     "test": "vitest",
