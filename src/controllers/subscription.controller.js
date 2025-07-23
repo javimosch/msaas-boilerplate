@@ -46,14 +46,26 @@ class SubscriptionController {
   async getSubscriptionStatus(req, res, next) {
     try {
       const db = getDB();
+      const userId = req.user._id;
+      
+      console.log(`subscription.controller getSubscriptionStatus`, {
+        userId,
+        userSubscription: req.user.subscription
+      });
       
       const subscription = await db.collection('subscriptions').findOne({
-        userId: new ObjectId(req.user._id)
+        userId: new ObjectId(userId)
+      });
+      
+      console.log(`subscription.controller subscription lookup result`, {
+        subscriptionId: subscription?._id?.toString(),
+        stripeSubscriptionId: subscription?.stripeSubscriptionId,
+        status: subscription?.status
       });
       
       res.json({
         success: true,
-        data: { 
+        data: {
           subscription: subscription || null,
           userSubscription: req.user.subscription
         }

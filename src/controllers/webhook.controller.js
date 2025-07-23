@@ -53,17 +53,33 @@ class WebhookController {
     try {
       const db = getDB();
       
+      logger.info('Handling subscription update webhook', {
+        event: 'customer.subscription.updated',
+        subscriptionId: subscription.id,
+        customerId: subscription.customer,
+        status: subscription.status
+      });
+      
       // Find user by Stripe customer ID
       const user = await db.collection('users').findOne({
         stripeCustomerId: subscription.customer
       });
       
       if (user) {
+        logger.info('Found user for subscription update', {
+          userId: user._id.toString(),
+          stripeCustomerId: user.stripeCustomerId
+        });
+        
         await stripeService.saveSubscription(user._id.toString(), subscription);
         
         if (subscription.status === 'active') {
           await emailService.sendSubscriptionConfirmation(user, subscription);
         }
+      } else {
+        logger.warn('No user found for subscription update', {
+          customerId: subscription.customer
+        });
       }
     } catch (error) {
       logger.error('Error handling subscription update:', error);

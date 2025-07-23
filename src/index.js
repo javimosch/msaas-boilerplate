@@ -78,8 +78,16 @@ async function startServer() {
     // Error handling middleware
     app.use(errorHandler);
     
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
+      
+      // Schedule subscription reconciliation every 5 minutes
+      const cron = require('node-cron');
+      const reconciliationService = require('./services/reconciliation.service');
+      cron.schedule('*/5 * * * *', () => {
+        logger.info('Running subscription reconciliation...');
+        reconciliationService.verifySubscriptionStatuses();
+      });
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

@@ -165,13 +165,13 @@ class StripeService {
         throw new Error('FRONTEND_URL environment variable is not set');
       }
       
+      // Ensure URL has proper scheme
       if (!frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
-        if (process.env.NODE_ENV === 'production') {
-          frontendUrl = `https://${frontendUrl}`;
-        } else {
-          frontendUrl = `http://${frontendUrl}`;
-        }
+        frontendUrl = `https://${frontendUrl}`;
       }
+      
+      // Remove trailing slash if present
+      frontendUrl = frontendUrl.replace(/\/$/, '');
       
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
