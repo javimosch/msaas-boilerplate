@@ -104,6 +104,90 @@ class SubscriptionController {
       next(error);
     }
   }
+
+  async checkByLookupKey(req, res, next) {
+    try {
+      const { lookupKey } = req.params;
+      const db = getDB();
+      
+      const subscription = await db.collection('subscriptions').findOne({
+        userId: new ObjectId(req.user._id),
+        'items.price.lookup_key': lookupKey,
+        status: { $in: ['active', 'trialing'] }
+      });
+      
+      const isSubscribed = !!subscription;
+      const isTrial = subscription?.status === 'trialing' &&
+                     subscription?.trial_end &&
+                     subscription.trial_end > Math.floor(Date.now() / 1000);
+      
+      res.json({
+        success: true,
+        data: {
+          subscribed: isSubscribed,
+          trial: isTrial
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkByMetadataName(req, res, next) {
+    try {
+      const { metadataName } = req.params;
+      const db = getDB();
+      
+      const subscription = await db.collection('subscriptions').findOne({
+        userId: new ObjectId(req.user._id),
+        'items.price.product.metadata.name': metadataName,
+        status: { $in: ['active', 'trialing'] }
+      });
+      
+      const isSubscribed = !!subscription;
+      const isTrial = subscription?.status === 'trialing' &&
+                     subscription?.trial_end &&
+                     subscription.trial_end > Math.floor(Date.now() / 1000);
+      
+      res.json({
+        success: true,
+        data: {
+          subscribed: isSubscribed,
+          trial: isTrial
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async checkByPriceId(req, res, next) {
+    try {
+      const { priceId } = req.params;
+      const db = getDB();
+      
+      const subscription = await db.collection('subscriptions').findOne({
+        userId: new ObjectId(req.user._id),
+        'items.price.id': priceId,
+        status: { $in: ['active', 'trialing'] }
+      });
+      
+      const isSubscribed = !!subscription;
+      const isTrial = subscription?.status === 'trialing' &&
+                     subscription?.trial_end &&
+                     subscription.trial_end > Math.floor(Date.now() / 1000);
+      
+      res.json({
+        success: true,
+        data: {
+          subscribed: isSubscribed,
+          trial: isTrial
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new SubscriptionController();

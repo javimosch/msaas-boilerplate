@@ -31,4 +31,13 @@ router.get('/status', subscriptionController.getSubscriptionStatus);
 // Cancel subscription
 router.delete('/cancel', subscriptionController.cancelSubscription);
 
+// Check subscription by price lookup key
+router.get('/check-by-lookup-key/:lookupKey', subscriptionController.checkByLookupKey);
+
+// Check subscription by metadata name
+router.get('/check-by-metadata-name/:metadataName', subscriptionController.checkByMetadataName);
+
+// Check subscription by price ID
+router.get('/check-by-price-id/:priceId', subscriptionController.checkByPriceId);
+
 module.exports = router;

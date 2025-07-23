@@ -37,6 +37,33 @@ class SubscriptionService {
   async cancelSubscription() {
     return apiService.delete('/api/subscriptions/cancel');
   }
+
+  /**
+   * Check if user is subscribed to a price by lookup key
+   * @param {string} lookupKey - The price lookup key
+   * @returns {Promise} - Response with { subscribed: boolean, trial: boolean }
+   */
+  async isUserSubscribedToPriceLookUpKey(lookupKey) {
+    return apiService.get(`/api/subscriptions/check-by-lookup-key/${lookupKey}`);
+  }
+
+  /**
+   * Check if user is subscribed to a price by metadata name
+   * @param {string} metadataName - The product metadata name
+   * @returns {Promise} - Response with { subscribed: boolean, trial: boolean }
+   */
+  async isUserSubscribedToPriceMatchingMetadataName(metadataName) {
+    return apiService.get(`/api/subscriptions/check-by-metadata-name/${metadataName}`);
+  }
+
+  /**
+   * Check if user is subscribed to a specific price ID
+   * @param {string} priceId - The Stripe price ID
+   * @returns {Promise} - Response with { subscribed: boolean, trial: boolean }
+   */
+  async isUserSubscribedToPriceId(priceId) {
+    return apiService.get(`/api/subscriptions/check-by-price-id/${priceId}`);
+  }
 }
 
-export const subscriptionService = new SubscriptionService();
+export const subscriptionService = window.subscriptionService = new SubscriptionService();
