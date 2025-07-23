@@ -124,7 +124,7 @@ class SubscriptionController {
       
       const subscription = await db.collection('subscriptions').findOne({
         userId: new ObjectId(req.user._id),
-        'items.price.lookup_key': lookupKey,
+        'stripePriceLookupKey': lookupKey,
         status: { $in: ['active', 'trialing'] }
       });
       
@@ -152,7 +152,7 @@ class SubscriptionController {
       
       const subscription = await db.collection('subscriptions').findOne({
         userId: new ObjectId(req.user._id),
-        'items.price.product.metadata.name': metadataName,
+        'stripePriceMetadata.name': metadataName,
         status: { $in: ['active', 'trialing'] }
       });
       
@@ -180,7 +180,7 @@ class SubscriptionController {
       
       const subscription = await db.collection('subscriptions').findOne({
         userId: new ObjectId(req.user._id),
-        'items.price.id': priceId,
+        'stripePriceId': priceId,
         status: { $in: ['active', 'trialing'] }
       });
       

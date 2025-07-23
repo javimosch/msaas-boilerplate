@@ -10,7 +10,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const webhookRoutes = require('./routes/webhook.routes');
-
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -39,15 +39,17 @@ async function startServer() {
     //Point app routes to app
     app.use('/*', (req, res, next) => {
 
+      const reqPath = req.initialUrl || req.path;
+
       //if req url contains "api", do next 
-      if(req.url.includes('api')) {
+      if(reqPath.includes('api')) {
         next();
         return;
       }
 
       //if no ext and route is an app route
-      const appRoutes = ['/dashboard','/billing']
-      if (!req.url.includes('.') && appRoutes.includes(req.url)) {
+      const appRoutes = ['/dashboard','/billing','/login']
+      if (!reqPath.includes('.') && appRoutes.includes(reqPath)) {
 
         //if prod
         if(process.env.NODE_ENV === 'production') {
@@ -66,6 +68,13 @@ async function startServer() {
           res.sendFile(path.join(process.cwd(), 'app', 'dist', 'index.html'));
         }
       }else{
+        console.log('not app route', {
+          path: reqPath,
+          url: req.url,
+          initialUrl: req.initialUrl,
+          method: req.method,
+          ip: req.ip
+        })
         next();
       }
     });
@@ -74,6 +83,10 @@ async function startServer() {
     app.get('/health', (req, res) => {
       res.json({ status: 'OK', timestamp: new Date().toISOString() });
     });
+
+    // Static files
+    app.use(express.static('public'));
+    app.use(express.static('app/dist'));
     
     // Error handling middleware
     app.use(errorHandler);

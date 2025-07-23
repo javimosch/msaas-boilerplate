@@ -8,21 +8,29 @@ const configureApp = (app) => {
   app.set('view engine', 'ejs');
   app.set('views', 'views');
   
-  // Static files
-  app.use(express.static('public'));
-  
   // Security middleware
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          "'nonce-landing-page'",
-          "https://cdn.tailwindcss.com",
-          "https://cdn.jsdelivr.net",
-          "https://cdnjs.cloudflare.com"
-        ],
+        scriptSrc: process.env.NODE_ENV === 'production' 
+          ? [
+              "'self'",
+              "'unsafe-inline'",
+              "'nonce-landing-page'",
+              "https://cdn.tailwindcss.com",
+              "https://cdn.jsdelivr.net", 
+              "https://cdnjs.cloudflare.com"
+            ]
+          : [
+              "'self'",
+              "'unsafe-inline'",
+              "'unsafe-eval'",
+              "'nonce-landing-page'",
+              "https://cdn.tailwindcss.com",
+              "https://cdn.jsdelivr.net", 
+              "https://cdnjs.cloudflare.com"
+            ],
         styleSrc: [
           "'self'",
           "'unsafe-inline'",
@@ -70,6 +78,7 @@ const configureApp = (app) => {
   // Request logging
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+    req.initialUrl = req.path;
     next();
   });
 };
