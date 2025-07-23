@@ -7,7 +7,7 @@
     <div class="header-content">
       <!-- Logo and Brand -->
       <div class="header-brand">
-        <router-link to="/dashboard" class="brand-link">
+        <router-link to="/" class="brand-link">
           <div class="brand-logo">
             <LogoIcon />
           </div>
