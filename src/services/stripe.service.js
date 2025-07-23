@@ -158,6 +158,21 @@ class StripeService {
       }
       
       // Create a checkout session
+      let frontendUrl = process.env.FRONTEND_URL;
+      
+      // Validate and fix URL scheme if needed
+      if (!frontendUrl) {
+        throw new Error('FRONTEND_URL environment variable is not set');
+      }
+      
+      if (!frontendUrl.startsWith('http://') && !frontendUrl.startsWith('https://')) {
+        if (process.env.NODE_ENV === 'production') {
+          frontendUrl = `https://${frontendUrl}`;
+        } else {
+          frontendUrl = `http://${frontendUrl}`;
+        }
+      }
+      
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -168,8 +183,8 @@ class StripeService {
         ],
         mode: 'subscription',
         customer: user.stripeCustomerId,
-        success_url: `${process.env.FRONTEND_URL}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
-        cancel_url: `${process.env.FRONTEND_URL}/billing?canceled=true`,
+        success_url: `${frontendUrl}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: `${frontendUrl}/billing?canceled=true`,
         metadata: {
           userId: userId
         }
