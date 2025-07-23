@@ -9,6 +9,50 @@ An interactive command-line tool for managing Stripe prices.
 - Edit price metadata using your preferred text editor
 - Real-time validation and notifications for changes
 
+## Available Commands
+
+### `view [options]`
+View and interact with Stripe prices.
+
+Options:
+- `-a, --all` - Show all prices (including inactive)
+- `-j, --json` - Output in JSON format
+
+### `edit-metadata`
+Interactively edit metadata of a selected Stripe price.
+
+### `activate`
+Activate an inactive Stripe price.
+
+### `deactivate`
+Deactivate an active Stripe price.
+
+### `products`
+View and manage Stripe products grouped by applications.
+
+### `create-product`
+Create a new Stripe product with application categorization.
+- Interactively prompt for product name, description, and application category
+- Option to select existing application categories or create a new one
+- Add custom metadata to the product
+- Option to create a price for the product immediately
+
+### `inactive-products`
+View and manage inactive (archived) products in Stripe.
+- List all deactivated products grouped by application
+- View details of inactive products
+- Reactivate products that were previously deactivated
+- Delete inactive products permanently
+- Edit metadata of inactive products
+- View associated prices of inactive products
+
+### `delete-product`
+Permanently delete a product and all its associated prices.
+- View and select from all products (active and inactive)
+- Multiple confirmation steps to prevent accidental deletion
+- Automatically deactivates any active prices before deletion
+- Completely removes the product and all associated data from Stripe
+
 ## Prerequisites
 
 - Node.js 14+ installed
