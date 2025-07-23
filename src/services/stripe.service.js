@@ -133,6 +133,39 @@ class StripeService {
       throw new Error(`Failed to fetch plans: ${error.message}`);
     }
   }
+  
+  async createCheckoutSession(userId, priceId) {
+    try {
+      const db = getDB();
+      const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      // Create a checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1
+          },
+        ],
+        mode: 'subscription',
+        customer: user.stripeCustomerId,
+        success_url: `${process.env.FRONTEND_URL}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: `${process.env.FRONTEND_URL}/billing?canceled=true`,
+        metadata: {
+          userId: userId
+        }
+      });
+      
+      return session;
+    } catch (error) {
+      throw new Error(`Failed to create checkout session: ${error.message}`);
+    }
+  }
 }
 
 module.exports = new StripeService();

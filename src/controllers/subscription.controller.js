@@ -78,6 +78,32 @@ class SubscriptionController {
       next(error);
     }
   }
+  
+  async createCheckoutSession(req, res, next) {
+    try {
+      const { priceId } = req.body;
+      
+      if (!priceId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Price ID is required'
+        });
+      }
+      
+      const session = await stripeService.createCheckoutSession(
+        req.user._id.toString(),
+        priceId
+      );
+      
+      res.json({
+        success: true,
+        message: 'Checkout session created successfully',
+        data: { session }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new SubscriptionController();

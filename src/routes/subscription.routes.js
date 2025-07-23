@@ -19,6 +19,12 @@ router.post('/create', [
   handleValidationErrors
 ], subscriptionController.createSubscription);
 
+// Create Stripe Checkout session
+router.post('/create-checkout-session', [
+  body('priceId').notEmpty().withMessage('Price ID is required'),
+  handleValidationErrors
+], subscriptionController.createCheckoutSession);
+
 // Get subscription status
 router.get('/status', subscriptionController.getSubscriptionStatus);
 
