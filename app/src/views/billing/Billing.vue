@@ -208,8 +208,9 @@ export default {
         return plan.metadata.name;
       }
       
+      return "No name"
       // Fallback: Capitalize the product name or use a generic name
-      return plan.nickname || `${plan.interval_count}-${plan.recurring.interval} Plan`;
+      //return plan.nickname || `${plan.interval_count}-${plan.recurring.interval} Plan`;
     };
     
     const getFeaturesFromMetadata = (plan) => {

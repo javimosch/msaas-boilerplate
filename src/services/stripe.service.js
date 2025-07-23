@@ -40,12 +40,26 @@ class StripeService {
         }
       });
       
-      // Create subscription
+      // Get the price details to retrieve the product name
+      const price = await stripe.prices.retrieve(priceId, {
+        expand: ['product']
+      });
+      
+      // Determine the plan name from the product or price
+      const planName = price.product?.name || 
+                       price.nickname || 
+                       `${price.recurring?.interval_count || 1}-${price.recurring?.interval || 'month'} Plan`;
+      
+      // Create subscription with metadata containing the plan name
       const subscription = await stripe.subscriptions.create({
         customer: user.stripeCustomerId,
         items: [{ price: priceId }],
         payment_behavior: 'default_incomplete',
-        expand: ['latest_invoice.payment_intent']
+        expand: ['latest_invoice.payment_intent'],
+        metadata: {
+          name: planName,
+          planId: priceId
+        }
       });
       
       // Save subscription to database
