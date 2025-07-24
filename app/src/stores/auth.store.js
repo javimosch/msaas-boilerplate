@@ -69,12 +69,12 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authService.register(userData);
       
       // Extract data from nested response structure
-      const { user: userData, tokens } = response.data || response;
+      const { user: responseUser, tokens } = response.data || response;
       
       // Store tokens and user data
       token.value = tokens?.accessToken || response.token;
       refreshToken.value = tokens?.refreshToken || response.refreshToken;
-      user.value = userData || response.user;
+      user.value = responseUser || response.user;
       
       // Persist tokens
       tokenService.setTokens(
