@@ -48,7 +48,7 @@ async function startServer() {
       }
 
       //if no ext and route is an app route
-      const appRoutes = ['/dashboard','/billing','/login']
+      const appRoutes = ['/dashboard','/billing','/login','/register']
       if (!reqPath.includes('.') && appRoutes.includes(reqPath)) {
 
         //if prod
